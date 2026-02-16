@@ -22,6 +22,9 @@ const lyricsInFlight = new Map();
 let latestLyricsRequestToken = 0;
 let latestSelectionToken = 0;
 let lyricsStorageLoaded = false;
+const JUDGE_TARGET_SR = 16000;
+const JUDGE_MAX_SECONDS = 24;
+const JUDGE_SILENCE_THRESHOLD = 0.007;
 
 const refs = {};
 
@@ -600,6 +603,9 @@ async function selectTrack(track) {
   if (typeof appInstance?.setTrack === "function") {
     appInstance.setTrack(playableTrack, { autoplay: false });
   }
+
+  // Warm reference processing now so judge starts faster later.
+  void getReferenceWavBlob(playableTrack).catch(() => {});
 }
 
 function clearSelection() {
@@ -636,6 +642,82 @@ let recorderNode;
 let recordingData = [];
 let recordingLength = 0;
 let sampleRate = 44100;
+
+function trimSilence(samples, sr) {
+  if (!samples?.length) return new Float32Array();
+  let start = 0;
+  let end = samples.length - 1;
+
+  while (start < samples.length && Math.abs(samples[start]) < JUDGE_SILENCE_THRESHOLD) {
+    start += 1;
+  }
+  while (end > start && Math.abs(samples[end]) < JUDGE_SILENCE_THRESHOLD) {
+    end -= 1;
+  }
+
+  if (start >= end) {
+    return samples;
+  }
+
+  const pad = Math.floor(sr * 0.08);
+  const safeStart = Math.max(0, start - pad);
+  const safeEnd = Math.min(samples.length, end + pad);
+  return samples.slice(safeStart, safeEnd);
+}
+
+function limitDuration(samples, sr, maxSeconds = JUDGE_MAX_SECONDS) {
+  const maxSamples = Math.floor(maxSeconds * sr);
+  if (samples.length <= maxSamples) return samples;
+  return samples.slice(0, maxSamples);
+}
+
+function resampleLinear(samples, inSr, outSr) {
+  if (!samples?.length) return new Float32Array();
+  if (!inSr || !outSr || inSr === outSr) return samples;
+
+  const ratio = outSr / inSr;
+  const outLength = Math.max(1, Math.floor(samples.length * ratio));
+  const out = new Float32Array(outLength);
+  for (let i = 0; i < outLength; i += 1) {
+    const pos = i / ratio;
+    const left = Math.floor(pos);
+    const right = Math.min(left + 1, samples.length - 1);
+    const frac = pos - left;
+    out[i] = samples[left] * (1 - frac) + samples[right] * frac;
+  }
+  return out;
+}
+
+function normalizePeak(samples) {
+  if (!samples?.length) return samples;
+  let peak = 0;
+  for (let i = 0; i < samples.length; i += 1) {
+    const value = Math.abs(samples[i]);
+    if (value > peak) peak = value;
+  }
+  if (peak < 1e-5) return samples;
+  const gain = 0.92 / peak;
+  if (gain >= 0.99 && gain <= 1.01) return samples;
+  const out = new Float32Array(samples.length);
+  for (let i = 0; i < samples.length; i += 1) {
+    out[i] = Math.max(-1, Math.min(1, samples[i] * gain));
+  }
+  return out;
+}
+
+function prepareAudioForJudge(samples, sr) {
+  let next = trimSilence(samples, sr);
+  next = limitDuration(next, sr);
+  next = resampleLinear(next, sr, JUDGE_TARGET_SR);
+  next = normalizePeak(next);
+  return { samples: next, sampleRate: JUDGE_TARGET_SR };
+}
+
+function prepareReferenceForJudge(samples, sr) {
+  let next = limitDuration(samples, sr, 30);
+  next = resampleLinear(next, sr, JUDGE_TARGET_SR);
+  return { samples: next, sampleRate: JUDGE_TARGET_SR };
+}
 
 function setupScriptProcessorFallback(source) {
   processor = audioContext.createScriptProcessor(4096, 1, 1);
@@ -746,8 +828,9 @@ function stopRecording() {
 function processWavRecording() {
   // Flatten buffer
   const buffer = mergeBuffers(recordingData, recordingLength);
+  const prepared = prepareAudioForJudge(buffer, sampleRate);
   // Encode WAV
-  const wavBlob = encodeWAV(buffer, sampleRate);
+  const wavBlob = encodeWAV(prepared.samples, prepared.sampleRate);
 
   uploadAudio(wavBlob);
 }
@@ -851,7 +934,8 @@ async function getReferenceWavBlob(track) {
       sourceBytes.slice(0),
     );
     const mono = audioBufferToMonoFloat32(decodedBuffer);
-    const wavBlob = encodeWAV(mono, decodedBuffer.sampleRate);
+    const prepared = prepareReferenceForJudge(mono, decodedBuffer.sampleRate);
+    const wavBlob = encodeWAV(prepared.samples, prepared.sampleRate);
 
     cachedReferencePreviewUrl = previewUrl;
     cachedReferenceWavBlob = wavBlob;
@@ -869,6 +953,9 @@ async function getReferenceWavBlob(track) {
 async function buildJudgeFormData(audioBlob, includeReference = true) {
   const formData = new FormData();
   formData.append("file", audioBlob, "user.wav");
+  formData.append("fast_mode", "1");
+  formData.append("include_tts", "0");
+  formData.append("include_llm", "0");
 
   if (includeReference && selectedTrack) {
     const referenceWavBlob = await getReferenceWavBlob(selectedTrack);
@@ -922,7 +1009,7 @@ async function postJudge(audioBlob, includeReference = true) {
     method: "POST",
     body: formData,
     returnResponse: true, // Request full response object for error handling
-    timeout: 120000, // 2 minutes for cold start + processing
+    timeout: 60000, // keep quick-fail behavior in fast mode
   });
 }
 
