@@ -18,6 +18,7 @@ const MAX_AI_BODY_BYTES = Number(
   process.env.MAX_AI_BODY_BYTES || 15 * 1024 * 1024,
 );
 const FETCH_TIMEOUT_MS = Number(process.env.FETCH_TIMEOUT_MS || 10000);
+const AI_PROXY_TIMEOUT_MS = Number(process.env.AI_PROXY_TIMEOUT_MS || 180000);
 const LYRICS_FETCH_TIMEOUT_MS = Number(
   process.env.LYRICS_FETCH_TIMEOUT_MS || 8500,
 );
@@ -148,13 +149,21 @@ async function proxyToAiEngine(req, reqUrl, res) {
   try {
     const needsBody = req.method !== "GET" && req.method !== "HEAD";
     const body = needsBody ? await readRequestBody(req) : undefined;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort("timeout"), AI_PROXY_TIMEOUT_MS);
 
-    const upstream = await fetch(targetUrlStr, {
-      method: req.method,
-      headers,
-      body,
-      duplex: "half", // Required for streaming bodies in some versions of Node fetch
-    });
+    let upstream;
+    try {
+      upstream = await fetch(targetUrlStr, {
+        method: req.method,
+        headers,
+        body,
+        duplex: "half", // Required for streaming bodies in some versions of Node fetch
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
 
     const responseBuffer = Buffer.from(await upstream.arrayBuffer());
     console.log(
@@ -170,8 +179,16 @@ async function proxyToAiEngine(req, reqUrl, res) {
     res.end(responseBuffer);
   } catch (error) {
     console.error("[Proxy Error]", error);
+    const timeoutError =
+      error?.name === "AbortError"
+        ? { error: `AI engine timed out after ${AI_PROXY_TIMEOUT_MS}ms.` }
+        : null;
     sendJson(res, 502, {
-      error: error.message || "AI engine proxy request failed.",
+      ...(timeoutError || {}),
+      error:
+        (timeoutError ? timeoutError.error : null) ||
+        error.message ||
+        "AI engine proxy request failed.",
     });
   }
 }

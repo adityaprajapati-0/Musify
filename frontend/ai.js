@@ -3,7 +3,7 @@ import {
   setStatus,
   createSongCard,
   apiFetch,
-} from "./common.js?v=20260216m5";
+} from "./common.js?v=20260216m6";
 
 let audioChunks = [];
 let isRecording = false;
@@ -1009,7 +1009,7 @@ async function postJudge(audioBlob, includeReference = true) {
     method: "POST",
     body: formData,
     returnResponse: true, // Request full response object for error handling
-    timeout: 60000, // keep quick-fail behavior in fast mode
+    timeout: 180000, // cold AI backends can take >60s to wake
   });
 }
 

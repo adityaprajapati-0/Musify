@@ -805,13 +805,25 @@ function resolveUrl(base, path) {
   return `${base}${path}`;
 }
 
+function isLocalOrigin(origin) {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin || "");
+}
+
+function runtimeFallbackBases(currentOrigin = window.location.origin) {
+  const localContext = isLocalOrigin(currentOrigin);
+  return FALLBACK_PROXY_BASES.filter((base) => {
+    const localBase = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(base);
+    return localBase ? localContext : true;
+  });
+}
+
 async function fetchWithTimeout(
   url,
   options = {},
   timeoutMs = API_FETCH_TIMEOUT_MS,
 ) {
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  const timer = window.setTimeout(() => controller.abort("timeout"), timeoutMs);
   try {
     return await fetch(url, { ...options, signal: controller.signal });
   } finally {
@@ -821,7 +833,7 @@ async function fetchWithTimeout(
 
 async function detectApiBase() {
   const currentOrigin = window.location.origin;
-  const candidates = [currentOrigin, ...FALLBACK_PROXY_BASES].filter(
+  const candidates = [currentOrigin, ...runtimeFallbackBases(currentOrigin)].filter(
     (value, index, array) => array.indexOf(value) === index,
   );
 
@@ -846,41 +858,39 @@ async function detectApiBase() {
 }
 
 async function apiFetch(path, options = {}) {
-  const baseCandidates = [apiBase, "", ...FALLBACK_PROXY_BASES].filter(
-    (value, index, array) => array.indexOf(value) === index,
-  );
+  const currentOrigin = window.location.origin;
+  const fallbackBases = runtimeFallbackBases(currentOrigin);
+  const localContext = isLocalOrigin(currentOrigin);
+  const baseCandidates = (
+    apiBase
+      ? [apiBase, ...fallbackBases.filter((base) => base !== apiBase)]
+      : localContext
+        ? ["", ...fallbackBases]
+        : [...fallbackBases, ""]
+  ).filter((value, index, array) => array.indexOf(value) === index);
 
   let lastError = new Error("No backend candidate available.");
 
   for (const base of baseCandidates) {
-    if (!base && !path.startsWith("http")) {
-      // Skip empty base if we want strict fallback
-    }
-
     const target = resolveUrl(base, path);
     try {
       // Allow overriding timeout via options.timeout
       const timeout = options.timeout || API_FETCH_TIMEOUT_MS;
       const response = await fetchWithTimeout(target, options, timeout);
 
-      // Clone to inspect body without consuming it
-      const clone = response.clone();
-      let data;
-      try {
-        data = await clone.json();
-      } catch {
-        // Not JSON (likely HTML error from proxy/Netlify)
-        throw new Error(`Invalid JSON from ${target}`);
-      }
-
       // WRAPPER MODE (for ai.js debugging)
       if (options.returnResponse) {
+        const contentType = String(response.headers.get("content-type") || "");
+        if (response.ok && !contentType.toLowerCase().includes("application/json")) {
+          throw new Error(`Invalid JSON from ${target}`);
+        }
+
         const wrapper = {
           ok: response.ok,
           status: response.status,
           statusText: response.statusText,
-          json: async () => data,
-          text: async () => JSON.stringify(data),
+          json: async () => response.clone().json(),
+          text: async () => response.clone().text(),
           url: target,
           headers: response.headers,
         };
@@ -902,6 +912,16 @@ async function apiFetch(path, options = {}) {
         }
 
         return wrapper;
+      }
+
+      // Clone to inspect body without consuming it
+      const clone = response.clone();
+      let data;
+      try {
+        data = await clone.json();
+      } catch {
+        // Not JSON (likely HTML error from proxy/Netlify)
+        throw new Error(`Invalid JSON from ${target}`);
       }
 
       // DEFAULT MODE (for rest of app) -> Return DATA directly
