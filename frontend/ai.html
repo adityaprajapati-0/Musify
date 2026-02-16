@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Musify - AI Singing Judge</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Sora:wght@500;700;800&display=swap"
+        rel="stylesheet" />
+    <link rel="preconnect" href="https://lrclib.net" crossorigin />
+    <link rel="stylesheet" href="./styles.css?v=20260216m5" />
+    <link rel="icon" type="image/png" href="./music logo.png" />
+    <style>
+        .ai-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 80vh;
+            text-align: center;
+            gap: 2rem;
+            padding: 3rem 2rem;
+            margin: 40px auto !important;
+            max-width: 1000px;
+            background: rgba(14, 22, 45, 0.9) !important;
+            backdrop-filter: blur(25px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            border-radius: 32px;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+            position: relative;
+            z-index: 10;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .mic-button {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow:
+                0 0 40px rgba(72, 243, 182, 0.3),
+                0 0 80px rgba(72, 243, 182, 0.15);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            z-index: 100;
+            margin: 1.5rem 0;
+            flex-shrink: 0;
+        }
+
+        .mic-button svg {
+            color: #0b1224;
+            width: 56px;
+            height: 56px;
+            transition: transform 0.3s ease;
+        }
+
+        .mic-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 50px rgba(72, 243, 182, 0.6);
+        }
+
+        .mic-button.recording {
+            background: #ff4757;
+            box-shadow: 0 0 50px rgba(255, 71, 87, 0.6);
+            animation: pulse-red 1.5s infinite;
+        }
+
+        .mic-button.recording svg {
+            color: white;
+        }
+
+        @keyframes pulse-red {
+            0% {
+                box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 20px rgba(255, 71, 87, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 71, 87, 0);
+            }
+        }
+
+        .stats-card {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            width: 100%;
+            max-width: 600px;
+            margin-top: 2rem;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1rem;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--accent);
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        .status-text {
+            font-size: 1.2rem;
+            min-height: 1.5em;
+        }
+
+        .feedback-box {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 1.5rem;
+            border-radius: 16px;
+            max-width: 600px;
+            width: 100%;
+            border-left: 4px solid var(--accent);
+            text-align: left;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .feedback-box.visible {
+            display: block;
+        }
+
+        .practice-zone {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            gap: 2rem;
+            margin-top: 1rem;
+        }
+
+        .practice-zone.visible {
+            display: flex;
+        }
+
+        .lyrics-coach {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            /* Changed from none to flex */
+            gap: 2rem;
+            align-items: flex-start;
+            flex-direction: row;
+        }
+
+        .lyrics-coach.visible {
+            display: flex;
+        }
+
+        .studio-booth {
+            position: relative;
+            flex: 1;
+            height: 320px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+        }
+
+        .booth-bg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: blur(40px) brightness(0.4);
+            transform: scale(1.1);
+            z-index: 1;
+        }
+
+        .booth-content {
+            position: relative;
+            z-index: 2;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 1.25rem;
+        }
+
+        .booth-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            text-align: left;
+        }
+
+        .booth-art {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .lyrics-box {
+            flex: 1;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            padding: 1.25rem;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            line-height: 1.6;
+            color: white;
+            font-family: 'Sora', sans-serif;
+            text-align: center;
+            white-space: pre-wrap;
+            scrollbar-width: none;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            mask-image: linear-gradient(transparent, black 15%, black 85%, transparent);
+            -webkit-mask-image: linear-gradient(transparent, black 15%, black 85%, transparent);
+        }
+
+        .lyrics-box::-webkit-scrollbar {
+            display: none;
+        }
+
+        .side-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
+            padding-top: 2rem;
+        }
+
+        .hidden-el {
+            display: none !important;
+        }
+
+
+        /* Hide the top player strip as requested */
+        .top-player {
+            display: none !important;
+        }
+
+        .panel {
+            width: 100%;
+        }
+
+        /* Mobile Optimization for AI Tutor */
+        @media (max-width: 768px) {
+            .ai-container {
+                padding: 1.5rem 1rem !important;
+                margin: 10px auto !important;
+                border-radius: 20px;
+                min-height: auto;
+            }
+
+            .ai-container h1 {
+                font-size: 1.5rem !important;
+            }
+
+            .search-area form {
+                flex-direction: column;
+                gap: 0.65rem !important;
+            }
+
+            .search-area button {
+                width: 100%;
+                padding: 0.8rem !important;
+            }
+
+            .lyrics-coach {
+                flex-direction: column;
+                gap: 1.5rem;
+            }
+
+            .studio-booth {
+                height: 280px;
+            }
+
+            .booth-header {
+                gap: 0.75rem;
+                align-items: center;
+            }
+
+            #selectedTrackTitle {
+                font-size: 1.1rem !important;
+            }
+
+            #selectedTrackArtist {
+                font-size: 0.85rem !important;
+            }
+
+            .side-controls {
+                padding-top: 0;
+                width: 100%;
+            }
+
+            #aiStatus {
+                max-width: 100% !important;
+                font-size: 0.85rem !important;
+            }
+
+            .mic-button {
+                width: 100px;
+                height: 100px;
+            }
+
+            .mic-button svg {
+                width: 40px;
+                height: 40px;
+            }
+
+            .stats-card {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+
+            .feedback-box {
+                padding: 1rem;
+            }
+
+            #aiSelectionGrid {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 0.6rem !important;
+                padding: 0.65rem !important;
+                border-radius: 16px !important;
+            }
+
+            #aiSelectionGrid .song-card {
+                padding: 0.35rem !important;
+                border-radius: 10px !important;
+            }
+
+            #aiSelectionGrid .card-art {
+                margin-bottom: 0.35rem !important;
+            }
+
+            #aiSelectionGrid .card-art img {
+                border-radius: 8px !important;
+            }
+
+            #aiSelectionGrid .card-badge {
+                left: 4px !important;
+                bottom: 4px !important;
+                padding: 2px 5px !important;
+                font-size: 0.5rem !important;
+                letter-spacing: 0.03em !important;
+            }
+
+            #aiSelectionGrid .song-card strong {
+                font-size: 0.66rem !important;
+                line-height: 1.18 !important;
+            }
+
+            #aiSelectionGrid .song-card span {
+                margin-top: 1px !important;
+                font-size: 0.58rem !important;
+                line-height: 1.12 !important;
+            }
+
+            .lyrics-box {
+                font-size: 0.92rem;
+                line-height: 1.5;
+                padding: 1rem;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .ai-container {
+                padding: 1.1rem 0.75rem !important;
+                border-radius: 16px;
+            }
+
+            #aiSelectionGrid {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 0.45rem !important;
+                padding: 0.5rem !important;
+            }
+
+            #aiSelectionGrid .song-card {
+                padding: 0.28rem !important;
+            }
+
+            #aiSelectionGrid .song-card strong {
+                font-size: 0.62rem !important;
+            }
+
+            #aiSelectionGrid .song-card span {
+                font-size: 0.54rem !important;
+            }
+
+            .studio-booth {
+                height: 240px;
+            }
+
+            .booth-content {
+                padding: 0.85rem;
+            }
+
+            .booth-header {
+                flex-wrap: wrap;
+            }
+
+            .booth-art {
+                width: 42px;
+                height: 42px;
+            }
+
+            .mic-button {
+                width: 88px;
+                height: 88px;
+            }
+
+            .mic-button svg {
+                width: 34px;
+                height: 34px;
+            }
+        }
+    </style>
+</head>
+
+<body class="player-inline">
+    <div id="mood-overlay" aria-hidden="true"></div>
+    <div class="ambient ambient-a" aria-hidden="true"></div>
+    <div class="ambient ambient-b" aria-hidden="true"></div>
+    <div class="noise" aria-hidden="true"></div>
+
+    <nav class="site-nav glass">
+        <a href="./index.html" class="logo-link" aria-label="Home">
+            <img src="./music logo.png" alt="Pulse Music Logo" class="nav-logo" />
+        </a>
+        <a href="./index.html" class="nav-link" data-nav="home" title="Home">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+        </a>
+        <a href="./songs.html" class="nav-link" data-nav="songs" title="Trending Songs">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 18V5l12-2v13"></path>
+                <circle cx="6" cy="18" r="3"></circle>
+                <circle cx="18" cy="16" r="3"></circle>
+            </svg>
+        </a>
+        <a href="./artists.html" class="nav-link" data-nav="artists" title="Trending Artists">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+        </a>
+        <a href="./playlists.html" class="nav-link" data-nav="playlists" title="Playlists">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="8" y1="6" x2="21" y2="6"></line>
+                <line x1="8" y1="12" x2="21" y2="12"></line>
+                <line x1="8" y1="18" x2="21" y2="18"></line>
+                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+            </svg>
+        </a>
+        <a href="./ai.html" class="nav-link active" data-nav="ai" title="AI Singing Judge">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2 2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"></path>
+                <rect x="5" y="11" width="14" height="10" rx="2"></rect>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+        </a>
+    </nav>
+
+    <header class="top-player glass">
+        <canvas id="visualizer" width="900" height="100"></canvas>
+        <div class="player-track">
+            <img id="playerArtwork" alt="Now playing artwork" referrerpolicy="no-referrer" />
+            <div>
+                <p class="eyebrow">Now Playing</p>
+                <h1 id="playerTitle">No song selected</h1>
+                <p id="playerArtist" class="muted">
+                    Pick any song from songs, artists, or playlists.
+                </p>
+            </div>
+        </div>
+        <div class="player-controls">
+            <button id="playerToggle" class="btn btn-primary" type="button" disabled>Play</button>
+            <a id="playerOpen" class="btn btn-ghost" href="#" target="_blank" rel="noreferrer">
+                Open
+            </a>
+            <label class="volume-inline">
+                <span>Volume</span>
+                <input id="playerVolume" type="range" min="0" max="1" step="0.01" value="0.8" />
+            </label>
+        </div>
+    </header>
+
+    <main>
+        <section class="content-grid single-col">
+            <div class="glass panel ai-container" style="margin-top: 20px;">
+                <h1 style="font-size: 1.8rem; margin-bottom: 0;">AI Singing Tutor 🎤</h1>
+                <p class="muted" style="font-size: 0.9rem;">Pick a song, then record yourself singing. I'll coach you
+                    through it.</p>
+
+                <div class="search-area">
+                    <form id="aiSearchForm" style="display: flex; gap: 0.8rem; width: 100%;">
+                        <input type="text" id="aiSearchInput" placeholder="Search for a song to sing..."
+                            style="flex: 1; background: transparent; border: none; color: white; padding: 0.6rem 1rem; outline: none; font-size: 1.1rem; font-family: inherit;" />
+                        <button type="submit" class="pill accent"
+                            style="padding: 0.6rem 2rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; height: auto; min-height: 100%;">Search</button>
+                    </form>
+                </div>
+
+                <div id="aiSelectionGrid" class="song-grid-mini"
+                    style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1.5rem; width: 100%; min-height: 200px; padding: 1rem; margin-top: 0.5rem; background: rgba(0, 0, 0, 0.2); border-radius: 24px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                    <!-- Songs will appear here -->
+                </div>
+
+                <div id="aiPracticeZone" class="practice-zone" style="width: 100%;">
+                    <div id="lyricsCoach" class="lyrics-coach">
+                        <div class="studio-booth">
+                            <img id="boothBgArt" src="" class="booth-bg" />
+                            <div class="booth-content">
+                                <div class="booth-header">
+                                    <img id="selectedTrackImg" src="" class="booth-art" />
+                                    <div>
+                                        <strong id="selectedTrackTitle"
+                                            style="display: block; font-size: 1.4rem;">Title</strong>
+                                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                            <span id="selectedTrackArtist" class="muted"
+                                                style="font-size: 1rem;">Artist</span>
+                                            <span id="aiLyricsStatus"
+                                                style="font-size: 0.75rem; color: var(--accent); opacity: 0.8;"></span>
+                                        </div>
+                                    </div>
+                                    <button id="clearSelection"
+                                        style="background: rgba(255, 71, 87, 0.2); border: 1px solid rgba(255, 71, 87, 0.3); color: #ff4757; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; margin-left: auto; display: flex; align-items: center; justify-content: center; font-weight: 800; backdrop-filter: blur(5px); z-index: 110; position: relative; transition: all 0.2s;">✕</button>
+                                </div>
+                                <pre id="aiLyrics" class="lyrics-box">No lyrics loaded yet.</pre>
+                            </div>
+                        </div>
+
+                        <div class="side-controls">
+                            <button id="recordBtn" class="mic-button" aria-label="Start Recording">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                    <line x1="12" y1="19" x2="12" y2="23"></line>
+                                    <line x1="8" y1="23" x2="16" y2="23"></line>
+                                </svg>
+                            </button>
+                            <p id="aiStatus" class="status-text"
+                                style="font-size: 0.9rem; max-width: 150px; line-height: 1.4; color: var(--muted);">
+                                Select a song to start coaching.</p>
+                        </div>
+                    </div>
+                </div>
+
+
+
+                <div id="statsResult" class="stats-card hidden-el">
+                    <div class="stat-box">
+                        <span class="stat-value" id="scorePitch">--%</span>
+                        <span class="muted">Pitch</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-value" id="scoreTiming">--%</span>
+                        <span class="muted">Timing</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-value" id="scoreStability">--%</span>
+                        <span class="muted">Stability</span>
+                    </div>
+                </div>
+
+                <div id="aiFeedback" class="feedback-box">
+                    <h4>Judge's Feedback:</h4>
+                    <p id="feedbackText" class="muted">...</p>
+                </div>
+
+                <audio id="judgeVoice" style="display:none"></audio>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="./ai.js?v=20260216v10"></script>
+</body>
+
+</html>

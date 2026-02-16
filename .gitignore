@@ -1,0 +1,14 @@
+node_modules/
+.env
+.DS_Store
+__pycache__/
+*.log
+*.pyc
+tmp/
+.gemini/
+.vscode/
+dist/
+build/
+backend/ai_engine/reference_cache/
+backend/ai_engine/user_input.wav
+backend/.server.json

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Musify Music | Trending Artists</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Sora:wght@500;700;800&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css?v=20260216m5" />
+  <link rel="icon" type="image/png" href="./music logo.png" />
+</head>
+
+<body class="player-inline">
+  <div id="mood-overlay" aria-hidden="true"></div>
+  <div class="ambient ambient-a" aria-hidden="true"></div>
+  <div class="ambient ambient-b" aria-hidden="true"></div>
+  <div class="noise" aria-hidden="true"></div>
+
+  <nav class="site-nav glass">
+    <a href="./index.html" class="logo-link" aria-label="Home">
+      <img src="./music logo.png" alt="Pulse Music Logo" class="nav-logo" />
+    </a>
+    <a href="./index.html" class="nav-link" data-nav="home" title="Home">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+      </svg>
+    </a>
+    <a href="./songs.html" class="nav-link" data-nav="songs" title="Trending Songs">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 18V5l12-2v13"></path>
+        <circle cx="6" cy="18" r="3"></circle>
+        <circle cx="18" cy="16" r="3"></circle>
+      </svg>
+    </a>
+    <a href="./artists.html" class="nav-link" data-nav="artists" title="Trending Artists">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+        <circle cx="9" cy="7" r="4"></circle>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+      </svg>
+    </a>
+    <a href="./playlists.html" class="nav-link" data-nav="playlists" title="Playlists">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="8" y1="6" x2="21" y2="6"></line>
+        <line x1="8" y1="12" x2="21" y2="12"></line>
+        <line x1="8" y1="18" x2="21" y2="18"></line>
+        <line x1="3" y1="6" x2="3.01" y2="6"></line>
+        <line x1="3" y1="12" x2="3.01" y2="12"></line>
+        <line x1="3" y1="18" x2="3.01" y2="18"></line>
+      </svg>
+    </a>
+    <a href="./ai.html" class="nav-link" data-nav="ai" title="AI Singing Judge">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2 2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"></path>
+        <rect x="5" y="11" width="14" height="10" rx="2"></rect>
+        <line x1="12" y1="21" x2="12" y2="23"></line>
+        <line x1="8" y1="23" x2="16" y2="23"></line>
+      </svg>
+    </a>
+  </nav>
+
+  <main class="page-wrap">
+    <section class="glass panel">
+      <div class="panel-head split">
+        <div>
+          <h2>Artists</h2>
+          <p class="muted">Top artists + playable top tracks.</p>
+        </div>
+        <div class="row-tools">
+          <select id="artistsCountry">
+            <option value="us">United States</option>
+            <option value="gb">United Kingdom</option>
+            <option value="in">India</option>
+            <option value="ca">Canada</option>
+            <option value="jp">Japan</option>
+            <option value="au">Australia</option>
+          </select>
+          <button id="artistsRefresh" class="btn btn-ghost" type="button">Refresh</button>
+        </div>
+      </div>
+    </section>
+
+    <header class="top-player glass">
+      <div class="player-track">
+        <img id="playerArtwork" alt="Now playing artwork" referrerpolicy="no-referrer" />
+        <div>
+          <p class="eyebrow">Now Playing</p>
+          <h1 id="playerTitle">No song selected</h1>
+          <p id="playerArtist" class="muted">Select artist songs to preview.</p>
+        </div>
+      </div>
+      <div class="player-controls">
+        <button id="playerToggle" class="btn btn-primary" type="button" disabled>Play</button>
+        <a id="playerOpen" class="btn btn-ghost" href="#" target="_blank" rel="noreferrer">
+          Open
+        </a>
+        <label class="volume-inline">
+          <span>Volume</span>
+          <input id="playerVolume" type="range" min="0" max="1" step="0.01" value="0.8" />
+        </label>
+      </div>
+    </header>
+
+    <section class="content-grid artists-layout">
+      <article class="glass panel">
+        <div class="panel-head">
+          <h3>Trending Artists</h3>
+          <p id="artistsStatus" class="muted">Loading artists...</p>
+        </div>
+        <div id="artistsGrid" class="card-grid artists"></div>
+      </article>
+
+      <aside class="glass panel detail-panel">
+        <div class="panel-head">
+          <h3>Artist Profile</h3>
+          <p id="artistTopStatus" class="muted">Select an artist to load details.</p>
+        </div>
+        <div class="artist-feature">
+          <img id="selectedArtistImage" class="artist-photo" alt="Artist" referrerpolicy="no-referrer" />
+          <div class="artist-meta">
+            <h4 id="selectedArtistName">No artist selected</h4>
+            <p id="selectedArtistBio" class="muted">Artist bio appears here.</p>
+          </div>
+        </div>
+        <hr />
+        <h3>Top Songs</h3>
+        <div id="artistTopGrid" class="card-grid songs compact"></div>
+      </aside>
+    </section>
+  </main>
+
+  <script type="module" src="./artists.js?v=20260215h"></script>
+</body>
+
+</html>

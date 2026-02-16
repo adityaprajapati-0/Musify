@@ -1,0 +1,12 @@
+# Runtime state
+.server.json
+
+# Python AI engine artifacts
+ai_engine/__pycache__/
+ai_engine/*.pyc
+ai_engine/tmp/
+ai_engine/reference_cache/
+ai_engine/*.wav
+ai_engine/*.webm
+ai_engine/*.mp3
+ai_engine/.venv/

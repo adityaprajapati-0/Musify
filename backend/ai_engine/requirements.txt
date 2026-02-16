@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+librosa
+numpy
+soundfile
+groq
+edge-tts
+crepe
+python-multipart
+scipy
+requests

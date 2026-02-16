@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Singing Feedback | Musify Music</title>
+    <link rel="stylesheet" href="common.css">
+    <link rel="stylesheet" href="feedback.css?v=20260216m1">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Outfit:wght@400;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="feedback-container">
+        <div class="feedback-top-actions">
+            <button onclick="window.history.back()" class="btn btn-ghost">Back</button>
+            <button onclick="window.location.href='/ai.html'" class="btn btn-primary">Try Again</button>
+        </div>
+
+        <header class="feedback-header">
+            <h1 class="premium-text">Performance Analysis</h1>
+            <p class="subtitle">The Judge has spoken. Here is your detailed analysis.</p>
+        </header>
+
+        <main class="feedback-grid">
+            <!-- Summary Stats Card -->
+            <section class="card summary-card">
+                <div class="score-radial">
+                    <canvas id="scoreChart"></canvas>
+                    <div class="score-text">
+                        <span id="overallScore">0</span>
+                        <small>Overall</small>
+                    </div>
+                </div>
+                <div class="stats-mini">
+                    <div class="stat-item">
+                        <span class="stat-label">Pitch</span>
+                        <span class="stat-value" id="pitchVal">0%</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Timing</span>
+                        <span class="stat-value" id="timingVal">0%</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Stability</span>
+                        <span class="stat-value" id="stabilityVal">0%</span>
+                    </div>
+                </div>
+            </section>
+
+            <div class="grid-right-col">
+                <!-- Detailed Graphs Card -->
+                <section class="card graph-card">
+                    <h3>Vocal Blueprint</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="mainChart"></canvas>
+                    </div>
+                </section>
+
+                <!-- AI Feedback Card -->
+                <section class="card content-card">
+                    <h3>Voice Critique</h3>
+                    <div class="critique-container">
+                        <div class="feedback-message" id="vocalCritique">
+                            Processing your vocal performance...
+                        </div>
+
+                        <div class="performance-previews">
+                            <div class="audio-section">
+                                <h4>The Judge</h4>
+                                <button id="playAudioBtn" class="btn mini-btn play-btn">
+                                    <span class="icon">▶</span> <span class="text">Play Feedback</span>
+                                </button>
+                            </div>
+                            <div class="audio-section">
+                                <h4>Your Voice</h4>
+                                <button id="playUserAudioBtn" class="btn mini-btn btn-ghost">
+                                    <span class="icon">▶</span> <span class="text">Listen Back</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <audio id="ttsAudio" hidden></audio>
+                    <audio id="userAudio" hidden></audio>
+                </section>
+            </div>
+        </main>
+
+
+    </div>
+    <script src="feedback.js?v=20260216v3"></script>
+</body>
+
+</html>

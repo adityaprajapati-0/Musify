@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: pulse-music-backend
+    runtime: docker
+    plan: free
+    region: singapore
+    envVars:
+      - key: PORT
+        value: 5501
+      - key: AI_ENGINE_URL
+        value: http://127.0.0.1:8000
+      - key: FETCH_TIMEOUT_MS
+        value: 10000
+      - key: LYRICS_FETCH_TIMEOUT_MS
+        value: 8500
