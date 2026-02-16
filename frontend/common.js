@@ -845,7 +845,7 @@ async function detectApiBase() {
   return null;
 }
 
-async function apiFetch(path) {
+async function apiFetch(path, options = {}) {
   const baseCandidates = [apiBase, "", ...FALLBACK_PROXY_BASES].filter(
     (value, index, array) => array.indexOf(value) === index,
   );
@@ -853,19 +853,53 @@ async function apiFetch(path) {
   let lastError = new Error("No backend candidate available.");
 
   for (const base of baseCandidates) {
+    if (!base && !path.startsWith("http")) {
+      // Skip empty base if we want strict fallback
+    }
+
     const target = resolveUrl(base, path);
     try {
-      const response = await fetchWithTimeout(target);
+      const response = await fetchWithTimeout(target, options);
+
+      // Clone to inspect body without consuming it
+      const clone = response.clone();
+      let data;
+      try {
+        data = await clone.json();
+      } catch {
+        // Not JSON (likely HTML error from proxy/Netlify)
+        throw new Error(`Invalid JSON from ${target}`);
+      }
+
+      const wrapper = {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        json: async () => data,
+        text: async () => JSON.stringify(data),
+        url: target,
+        headers: response.headers,
+      };
+
       if (response.ok) {
         apiBase = base;
-        return response.json();
+        return wrapper;
       }
-      lastError = new Error(`Request failed: ${response.status} (${target})`);
-      if (response.status === 404 || response.status >= 500) {
+
+      // Retry server errors (5xx) or 404s that look like generic Proxy errors
+      if (
+        response.status >= 500 ||
+        (response.status === 404 && data.error !== "Not Found")
+      ) {
+        lastError = new Error(
+          `Server Error ${response.status}: ${data.error || "Unknown"}`,
+        );
         continue;
       }
-      throw lastError;
+
+      return wrapper;
     } catch (error) {
+      console.warn(`Fetch failed for ${target}:`, error);
       lastError = error;
     }
   }
