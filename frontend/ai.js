@@ -1,4 +1,9 @@
-import { initShell, setStatus, createSongCard } from "./common.js?v=20260216m5";
+import {
+  initShell,
+  setStatus,
+  createSongCard,
+  apiFetch,
+} from "./common.js?v=20260216m5";
 
 let audioChunks = [];
 let isRecording = false;
@@ -912,7 +917,8 @@ function parseJudgeError(data) {
 
 async function postJudge(audioBlob, includeReference = true) {
   const formData = await buildJudgeFormData(audioBlob, includeReference);
-  return fetch("/api/ai/judge", {
+  // Using apiFetch ensures we use the correct backend URL (proxy or direct)
+  return apiFetch("/api/ai/judge", {
     method: "POST",
     body: formData,
   });
