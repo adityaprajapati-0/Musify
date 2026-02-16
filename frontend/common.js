@@ -1,4 +1,8 @@
-const FALLBACK_PROXY_BASES = ["http://localhost:5501", "http://127.0.0.1:5501"];
+const FALLBACK_PROXY_BASES = [
+  "https://musify-c3k8.onrender.com",
+  "http://localhost:5501",
+  "http://127.0.0.1:5501",
+];
 const API_FETCH_TIMEOUT_MS = 4500;
 const HEALTHCHECK_TIMEOUT_MS = 1400;
 const PLAYER_TRACK_KEY = "pulse.music.player.track";
@@ -801,7 +805,11 @@ function resolveUrl(base, path) {
   return `${base}${path}`;
 }
 
-async function fetchWithTimeout(url, options = {}, timeoutMs = API_FETCH_TIMEOUT_MS) {
+async function fetchWithTimeout(
+  url,
+  options = {},
+  timeoutMs = API_FETCH_TIMEOUT_MS,
+) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
