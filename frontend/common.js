@@ -871,22 +871,44 @@ async function apiFetch(path, options = {}) {
         throw new Error(`Invalid JSON from ${target}`);
       }
 
-      const wrapper = {
-        ok: response.ok,
-        status: response.status,
-        statusText: response.statusText,
-        json: async () => data,
-        text: async () => JSON.stringify(data),
-        url: target,
-        headers: response.headers,
-      };
+      // WRAPPER MODE (for ai.js debugging)
+      if (options.returnResponse) {
+        const wrapper = {
+          ok: response.ok,
+          status: response.status,
+          statusText: response.statusText,
+          json: async () => data,
+          text: async () => JSON.stringify(data),
+          url: target,
+          headers: response.headers,
+        };
 
-      if (response.ok) {
-        apiBase = base;
+        if (response.ok) {
+          apiBase = base;
+          return wrapper;
+        }
+
+        // Retry server errors (5xx)
+        if (
+          response.status >= 500 ||
+          (response.status === 404 && data.error !== "Not Found")
+        ) {
+          lastError = new Error(
+            `Server Error ${response.status}: ${data.error || "Unknown"}`,
+          );
+          continue;
+        }
+
         return wrapper;
       }
 
-      // Retry server errors (5xx) or 404s that look like generic Proxy errors
+      // DEFAULT MODE (for rest of app) -> Return DATA directly
+      if (response.ok) {
+        apiBase = base;
+        return data;
+      }
+
+      // Retry server errors (5xx)
       if (
         response.status >= 500 ||
         (response.status === 404 && data.error !== "Not Found")
@@ -897,7 +919,13 @@ async function apiFetch(path, options = {}) {
         continue;
       }
 
-      return wrapper;
+      // Throw client errors (400, 403) so app can handle them
+      const error = new Error(
+        data.error || `Request failed: ${response.status}`,
+      );
+      error.status = response.status;
+      error.data = data;
+      throw error;
     } catch (error) {
       console.warn(`Fetch failed for ${target}:`, error);
       lastError = error;

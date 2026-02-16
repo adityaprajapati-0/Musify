@@ -921,6 +921,7 @@ async function postJudge(audioBlob, includeReference = true) {
   return apiFetch("/api/ai/judge", {
     method: "POST",
     body: formData,
+    returnResponse: true, // Request full response object for error handling
   });
 }
 
