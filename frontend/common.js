@@ -859,7 +859,9 @@ async function apiFetch(path, options = {}) {
 
     const target = resolveUrl(base, path);
     try {
-      const response = await fetchWithTimeout(target, options);
+      // Allow overriding timeout via options.timeout
+      const timeout = options.timeout || API_FETCH_TIMEOUT_MS;
+      const response = await fetchWithTimeout(target, options, timeout);
 
       // Clone to inspect body without consuming it
       const clone = response.clone();

@@ -922,6 +922,7 @@ async function postJudge(audioBlob, includeReference = true) {
     method: "POST",
     body: formData,
     returnResponse: true, // Request full response object for error handling
+    timeout: 45000,
   });
 }
 
