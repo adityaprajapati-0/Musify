@@ -922,7 +922,7 @@ async function postJudge(audioBlob, includeReference = true) {
     method: "POST",
     body: formData,
     returnResponse: true, // Request full response object for error handling
-    timeout: 45000,
+    timeout: 120000, // 2 minutes for cold start + processing
   });
 }
 
@@ -930,7 +930,21 @@ async function uploadAudio(audioBlob) {
   let retriedWithoutReference = false;
 
   try {
+    setStatus(
+      refs.status,
+      "Analyzing... This might take a minute if the server is waking up.",
+    );
+
+    // Helper to show "Waking up..." message if it takes too long
+    const wakeUpTimer = setTimeout(() => {
+      setStatus(
+        refs.status,
+        "Server is waking up from sleep... please wait...",
+      );
+    }, 6000);
+
     let response = await postJudge(audioBlob, true);
+    clearTimeout(wakeUpTimer);
 
     if (!response.ok) {
       const text = await response.text().catch(() => "");
