@@ -6,6 +6,7 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y \
     curl \
     libsndfile1 \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js
@@ -32,12 +33,12 @@ EXPOSE 5501
 
 # Create a startup script
 RUN echo '#!/bin/bash\n\
-# Start AI Engine in background\n\
-cd backend/ai_engine && uvicorn main:app --host 127.0.0.1 --port 8000 & \n\
-\n\
-# Start Node.js Server in foreground\n\
-cd backend && node server.js --port 5501\n\
-' > /app/start.sh && chmod +x /app/start.sh
+    # Start AI Engine in background\n\
+    cd backend/ai_engine && uvicorn main:app --host 127.0.0.1 --port 8000 & \n\
+    \n\
+    # Start Node.js Server in foreground\n\
+    cd backend && node server.js --port 5501\n\
+    ' > /app/start.sh && chmod +x /app/start.sh
 
 # Start command
 CMD ["/app/start.sh"]
