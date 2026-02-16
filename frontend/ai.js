@@ -925,8 +925,23 @@ async function uploadAudio(audioBlob) {
     let response = await postJudge(audioBlob, true);
 
     if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      console.error("Backend Error Detail:", data);
+      const text = await response.text().catch(() => "");
+      console.error(
+        `Backend Error (${response.status} ${response.statusText}):`,
+        text,
+      );
+
+      let data = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // Not JSON (likely HTML error from Render or 502 proxy)
+        data = {
+          error: `Server Error (${response.status})`,
+          detail: text.slice(0, 200),
+        };
+      }
+
       const parsed = parseJudgeError(data);
 
       if (selectedTrack && parsed.isDecodeBackendIssue) {
@@ -935,8 +950,14 @@ async function uploadAudio(audioBlob) {
           "Reference preview format unsupported. Retrying with vocal-only judging...";
         response = await postJudge(audioBlob, false);
         if (!response.ok) {
-          const retryData = await response.json().catch(() => ({}));
-          console.error("Backend Retry Error Detail:", retryData);
+          const retryText = await response.text().catch(() => "");
+          console.error(`Backend Retry Error (${response.status}):`, retryText);
+          let retryData = {};
+          try {
+            retryData = JSON.parse(retryText);
+          } catch {
+            retryData = { error: "Retry failed", detail: retryText };
+          }
           const retryParsed = parseJudgeError(retryData);
           throw new Error(retryParsed.msg);
         }
