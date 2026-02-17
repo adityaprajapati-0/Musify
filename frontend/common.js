@@ -5,14 +5,14 @@ const FALLBACK_PROXY_BASES = [
 ];
 const API_FETCH_TIMEOUT_MS = 4500;
 const HEALTHCHECK_TIMEOUT_MS = 1400;
-const PLAYER_TRACK_KEY = "pulse.music.player.track";
-const PLAYER_VOLUME_KEY = "pulse.music.player.volume";
-const SAVED_TRACKS_KEY = "pulse.music.savedTracks";
-const CUSTOM_PLAYLIST_KEY = "pulse.music.customPlaylist";
-const QUEUE_KEY = "pulse.music.queue";
-const QUEUE_INDEX_KEY = "pulse.music.queueIndex";
-const LOOP_MODE_KEY = "pulse.music.loopMode";
-const HISTORY_KEY = "pulse.music.history";
+const PLAYER_TRACK_KEY = "musify.music.player.track";
+const PLAYER_VOLUME_KEY = "musify.music.player.volume";
+const SAVED_TRACKS_KEY = "musify.music.savedTracks";
+const CUSTOM_PLAYLIST_KEY = "musify.music.customPlaylist";
+const QUEUE_KEY = "musify.music.queue";
+const QUEUE_INDEX_KEY = "musify.music.queueIndex";
+const LOOP_MODE_KEY = "musify.music.loopMode";
+const HISTORY_KEY = "musify.music.history";
 
 const LOOP_MODES = {
   OFF: 0,
@@ -812,7 +812,9 @@ function isLocalOrigin(origin) {
 function runtimeFallbackBases(currentOrigin = window.location.origin) {
   const localContext = isLocalOrigin(currentOrigin);
   return FALLBACK_PROXY_BASES.filter((base) => {
-    const localBase = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(base);
+    const localBase = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(
+      base,
+    );
     return localBase ? localContext : true;
   });
 }
@@ -833,9 +835,10 @@ async function fetchWithTimeout(
 
 async function detectApiBase() {
   const currentOrigin = window.location.origin;
-  const candidates = [currentOrigin, ...runtimeFallbackBases(currentOrigin)].filter(
-    (value, index, array) => array.indexOf(value) === index,
-  );
+  const candidates = [
+    currentOrigin,
+    ...runtimeFallbackBases(currentOrigin),
+  ].filter((value, index, array) => array.indexOf(value) === index);
 
   for (const origin of candidates) {
     try {
@@ -881,7 +884,10 @@ async function apiFetch(path, options = {}) {
       // WRAPPER MODE (for ai.js debugging)
       if (options.returnResponse) {
         const contentType = String(response.headers.get("content-type") || "");
-        if (response.ok && !contentType.toLowerCase().includes("application/json")) {
+        if (
+          response.ok &&
+          !contentType.toLowerCase().includes("application/json")
+        ) {
           throw new Error(`Invalid JSON from ${target}`);
         }
 

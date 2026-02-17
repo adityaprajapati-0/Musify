@@ -5,7 +5,23 @@ import librosa
 import numpy as np
 import soundfile as sf
 
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name, str(default))
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return int(default)
+
+
 USE_PYIN = os.getenv("AI_USE_PYIN", "0").strip().lower() in {"1", "true", "yes", "on"}
+ANALYSIS_SAMPLE_RATE = max(8000, _env_int("AI_ANALYSIS_SAMPLE_RATE", 16000))
+TIMING_SAMPLE_RATE = max(8000, _env_int("AI_TIMING_SAMPLE_RATE", 16000))
+DEFAULT_PITCH_HOP_LENGTH = max(256, _env_int("AI_PITCH_HOP_LENGTH", 768))
+FAST_PITCH_HOP_LENGTH = max(
+    DEFAULT_PITCH_HOP_LENGTH,
+    _env_int("AI_FAST_PITCH_HOP_LENGTH", 1024),
+)
 
 
 def _is_missing_backend_error(exc: Exception) -> bool:
@@ -77,8 +93,12 @@ def get_audio_duration(file_path: str) -> float:
             return float(librosa.get_duration(y=audio, sr=sr))
 
 
-def extract_pitch(file_path: str, hop_length: int = 512) -> np.ndarray:
-    audio, sr = _load_mono_audio(file_path)
+def extract_pitch(
+    file_path: str,
+    hop_length: int = DEFAULT_PITCH_HOP_LENGTH,
+    target_sr: Optional[int] = ANALYSIS_SAMPLE_RATE,
+) -> np.ndarray:
+    audio, sr = _load_mono_audio(file_path, target_sr=target_sr)
 
     if USE_PYIN:
         try:
@@ -99,14 +119,11 @@ def extract_pitch(file_path: str, hop_length: int = 512) -> np.ndarray:
     if pitches.size == 0:
         return np.array([], dtype=np.float32)
 
-    values = []
-    for i in range(pitches.shape[1]):
-        frame_idx = magnitudes[:, i].argmax()
-        value = pitches[frame_idx, i]
-        if value > 0:
-            values.append(value)
-
-    return np.array(values, dtype=np.float32)
+    frame_indices = np.argmax(magnitudes, axis=0)
+    frame_positions = np.arange(pitches.shape[1])
+    values = pitches[frame_indices, frame_positions]
+    voiced = values[values > 0]
+    return voiced.astype(np.float32, copy=False)
 
 
 def calculate_pitch_accuracy(
@@ -142,9 +159,13 @@ def _safe_corrcoef(a: np.ndarray, b: np.ndarray) -> float:
     return corr
 
 
-def calculate_timing_accuracy(reference_file: str, user_file: str) -> float:
-    ref_audio, ref_sr = _load_mono_audio(reference_file, target_sr=22050)
-    user_audio, user_sr = _load_mono_audio(user_file, target_sr=22050)
+def calculate_timing_accuracy(
+    reference_file: str,
+    user_file: str,
+    target_sr: int = TIMING_SAMPLE_RATE,
+) -> float:
+    ref_audio, ref_sr = _load_mono_audio(reference_file, target_sr=target_sr)
+    user_audio, user_sr = _load_mono_audio(user_file, target_sr=target_sr)
 
     ref_onset = librosa.onset.onset_strength(y=ref_audio, sr=ref_sr)
     user_onset = librosa.onset.onset_strength(y=user_audio, sr=user_sr)
@@ -234,17 +255,34 @@ def _self_pitch_consistency_score(user_pitch: np.ndarray) -> float:
     return round(max(0.0, min(100.0, score)), 2)
 
 
-def generate_stats(user_file: str, reference_file: Optional[str] = None) -> dict:
-    user_pitch = extract_pitch(user_file)
+def generate_stats(
+    user_file: str,
+    reference_file: Optional[str] = None,
+    fast_mode: bool = False,
+) -> dict:
+    hop_length = FAST_PITCH_HOP_LENGTH if fast_mode else DEFAULT_PITCH_HOP_LENGTH
+    user_pitch = extract_pitch(
+        user_file,
+        hop_length=hop_length,
+        target_sr=ANALYSIS_SAMPLE_RATE,
+    )
     stability_score = calculate_stability_score(user_pitch)
 
     pitch_accuracy = 0.0
     timing_accuracy = 75.0
 
     if reference_file and os.path.exists(reference_file):
-        ref_pitch = extract_pitch(reference_file)
+        ref_pitch = extract_pitch(
+            reference_file,
+            hop_length=hop_length,
+            target_sr=ANALYSIS_SAMPLE_RATE,
+        )
         pitch_accuracy = calculate_pitch_accuracy(ref_pitch, user_pitch)
-        timing_accuracy = calculate_timing_accuracy(reference_file, user_file)
+        timing_accuracy = calculate_timing_accuracy(
+            reference_file,
+            user_file,
+            target_sr=TIMING_SAMPLE_RATE,
+        )
     else:
         pitch_accuracy = _self_pitch_consistency_score(user_pitch)
 

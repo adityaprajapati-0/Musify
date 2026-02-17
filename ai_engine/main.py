@@ -30,7 +30,7 @@ TTS_TIMEOUT_SECONDS = float(os.getenv("AI_TTS_TIMEOUT_SECONDS", "12"))
 TMP_DIR.mkdir(parents=True, exist_ok=True)
 REFERENCE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="Pulse Singing Judge AI")
+app = FastAPI(title="Musify Singing Judge AI")
 
 app.add_middleware(
     CORSMiddleware,
@@ -142,7 +142,7 @@ def _download_reference(reference_url: str) -> Path:
             url,
             timeout=REFERENCE_TIMEOUT_SECONDS,
             stream=True,
-            headers={"User-Agent": "PulseMusic-AI/1.0"},
+            headers={"User-Agent": "Musify-AI/1.0"},
         )
         response.raise_for_status()
     except Exception as exc:
@@ -199,7 +199,7 @@ async def startup_event():
 
 @app.get("/health")
 async def health():
-    return {"ok": True, "service": "pulse-singing-judge"}
+    return {"ok": True, "service": "musify-singing-judge"}
 
 
 @app.post("/judge")

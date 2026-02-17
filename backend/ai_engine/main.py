@@ -3,6 +3,7 @@ import asyncio
 import hashlib
 import os
 import uuid
+import wave
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
@@ -30,7 +31,7 @@ TTS_TIMEOUT_SECONDS = float(os.getenv("AI_TTS_TIMEOUT_SECONDS", "12"))
 TMP_DIR.mkdir(parents=True, exist_ok=True)
 REFERENCE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="Pulse Singing Judge AI")
+app = FastAPI(title="Musify Singing Judge AI")
 
 app.add_middleware(
     CORSMiddleware,
@@ -50,6 +51,19 @@ def _safe_text(value: str, fallback: str = "Unknown", max_length: int = 120) -> 
     if not trimmed:
         return fallback
     return trimmed[:max_length]
+
+
+def _to_bool(value, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    normalized = str(value).strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off", ""}:
+        return False
+    return default
 
 
 def _safe_remove(path: Path):
@@ -142,7 +156,7 @@ def _download_reference(reference_url: str) -> Path:
             url,
             timeout=REFERENCE_TIMEOUT_SECONDS,
             stream=True,
-            headers={"User-Agent": "PulseMusic-AI/1.0"},
+            headers={"User-Agent": "Musify-AI/1.0"},
         )
         response.raise_for_status()
     except Exception as exc:
@@ -173,6 +187,35 @@ def _download_reference(reference_url: str) -> Path:
     return target
 
 
+def _write_silent_wav(path: Path, sample_rate: int = 16000, seconds: float = 1.0):
+    frames = max(1, int(sample_rate * seconds))
+    silence_frame = (0).to_bytes(2, byteorder="little", signed=True)
+    with wave.open(str(path), "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(silence_frame * frames)
+
+
+def _run_analysis_warmup():
+    warmup_user = TMP_DIR / f"warmup_user_{uuid.uuid4().hex}.wav"
+    warmup_reference = TMP_DIR / f"warmup_reference_{uuid.uuid4().hex}.wav"
+    try:
+        _write_silent_wav(warmup_user)
+        _write_silent_wav(warmup_reference)
+        generate_stats(str(warmup_user), str(warmup_reference), fast_mode=True)
+        print("Audio analysis warmup completed.")
+    except Exception as exc:
+        print(f"Audio analysis warmup skipped: {exc}")
+    finally:
+        _safe_remove(warmup_user)
+        _safe_remove(warmup_reference)
+
+
+async def _warmup_analysis_pipeline():
+    await run_in_threadpool(_run_analysis_warmup)
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     import traceback
@@ -196,10 +239,11 @@ async def startup_event():
     for route in app.routes:
         if hasattr(route, "path"):
             print(f"  {route.path} {getattr(route, 'methods', [])}")
+    asyncio.create_task(_warmup_analysis_pipeline())
 
 @app.get("/health")
 async def health():
-    return {"ok": True, "service": "pulse-singing-judge"}
+    return {"ok": True, "service": "musify-singing-judge"}
 
 
 @app.post("/judge")
@@ -210,6 +254,9 @@ async def judge_song(
     reference_title: str = Form(default="Unknown"),
     reference_artist: str = Form(default="Unknown"),
     judge_style: str = Form(default="encouraging"),
+    fast_mode: str = Form(default="0"),
+    include_tts: str = Form(default="1"),
+    include_llm: str = Form(default="1"),
 ):
     user_file_path = await _save_upload(file, prefix="user")
     reference_file_path = None
@@ -220,6 +267,12 @@ async def judge_song(
     safe_title = _safe_text(reference_title)
     safe_artist = _safe_text(reference_artist)
     safe_style = _safe_text(judge_style, fallback="encouraging", max_length=30).lower()
+    fast_requested = _to_bool(fast_mode, default=False)
+    use_llm = _to_bool(include_llm, default=not fast_requested)
+    use_tts = _to_bool(include_tts, default=not fast_requested)
+    if fast_requested:
+        use_llm = False
+        use_tts = False
 
     try:
         _validate_duration(user_file_path, "User")
@@ -264,6 +317,7 @@ async def judge_song(
                 generate_stats,
                 str(user_file_path),
                 str(reference_file_path) if reference_file_path else None,
+                fast_requested,
             )
         except Exception as exc:
             if reference_file_path:
@@ -279,6 +333,7 @@ async def judge_song(
                         generate_stats,
                         str(user_file_path),
                         None,
+                        fast_requested,
                     )
                 except Exception as inner_exc:
                     message = str(inner_exc).strip() or "Could not process uploaded audio."
@@ -287,18 +342,26 @@ async def judge_song(
                 message = str(exc).strip() or "Could not process uploaded audio."
                 raise HTTPException(status_code=400, detail=message) from exc
 
-        try:
-            feedback_text = await asyncio.wait_for(
-                run_in_threadpool(
-                    get_feedback,
+        if use_llm:
+            try:
+                feedback_text = await asyncio.wait_for(
+                    run_in_threadpool(
+                        get_feedback,
+                        stats,
+                        safe_title,
+                        safe_artist,
+                        safe_style,
+                    ),
+                    timeout=LLM_TIMEOUT_SECONDS,
+                )
+            except asyncio.TimeoutError:
+                feedback_text = local_feedback(
                     stats,
                     safe_title,
                     safe_artist,
                     safe_style,
-                ),
-                timeout=LLM_TIMEOUT_SECONDS,
-            )
-        except asyncio.TimeoutError:
+                )
+        else:
             feedback_text = local_feedback(
                 stats,
                 safe_title,
@@ -307,16 +370,17 @@ async def judge_song(
             )
 
         audio_b64 = ""
-        output_audio_path = TMP_DIR / f"feedback_{uuid.uuid4().hex}.mp3"
-        try:
-            await asyncio.wait_for(
-                generate_voice(feedback_text, str(output_audio_path)),
-                timeout=TTS_TIMEOUT_SECONDS,
-            )
-            with output_audio_path.open("rb") as audio_file:
-                audio_b64 = base64.b64encode(audio_file.read()).decode("utf-8")
-        except (asyncio.TimeoutError, Exception):
-            audio_b64 = ""
+        if use_tts:
+            output_audio_path = TMP_DIR / f"feedback_{uuid.uuid4().hex}.mp3"
+            try:
+                await asyncio.wait_for(
+                    generate_voice(feedback_text, str(output_audio_path)),
+                    timeout=TTS_TIMEOUT_SECONDS,
+                )
+                with output_audio_path.open("rb") as audio_file:
+                    audio_b64 = base64.b64encode(audio_file.read()).decode("utf-8")
+            except (asyncio.TimeoutError, Exception):
+                audio_b64 = ""
 
         return {
             "stats": stats,

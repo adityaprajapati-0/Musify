@@ -89,7 +89,7 @@ async function fetchJson(url, options = {}) {
   try {
     const response = await fetch(url, {
       headers: {
-        "User-Agent": "PulseMusic/1.0 (+local-dev)",
+        "User-Agent": "Musify/1.0 (+local-dev)",
         Accept: "application/json",
       },
       signal: controller.signal,
@@ -150,7 +150,10 @@ async function proxyToAiEngine(req, reqUrl, res) {
     const needsBody = req.method !== "GET" && req.method !== "HEAD";
     const body = needsBody ? await readRequestBody(req) : undefined;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort("timeout"), AI_PROXY_TIMEOUT_MS);
+    const timer = setTimeout(
+      () => controller.abort("timeout"),
+      AI_PROXY_TIMEOUT_MS,
+    );
 
     let upstream;
     try {
@@ -804,7 +807,7 @@ async function handleApi(req, reqUrl, res) {
     }
 
     if (reqUrl.pathname === "/health") {
-      return sendJson(res, 200, { ok: true, service: "pulse-music-proxy" });
+      return sendJson(res, 200, { ok: true, service: "musify-music-proxy" });
     }
 
     if (reqUrl.pathname === "/api/trending") {
@@ -977,5 +980,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Pulse Music server running on http://localhost:${PORT}`);
+  console.log(`Musify server running on http://localhost:${PORT}`);
 });

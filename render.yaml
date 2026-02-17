@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: pulse-music-backend
+    name: musify-backend
     runtime: docker
     plan: free
     region: singapore

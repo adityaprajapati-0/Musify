@@ -27,7 +27,7 @@ function Get-ListeningPid([int]$p) {
 function Test-PulseHealth([int]$p) {
   try {
     $resp = Invoke-RestMethod -Uri "http://localhost:$p/health" -Method Get -TimeoutSec 3
-    return ($resp.ok -eq $true -and $resp.service -eq "pulse-music-proxy")
+    return ($resp.ok -eq $true -and $resp.service -eq "musify-music-proxy")
   } catch {
     return $false
   }
@@ -37,7 +37,7 @@ if (Test-Path $stateFile) {
   try {
     $state = Get-Content $stateFile -Raw | ConvertFrom-Json
     if ($state.pid -and (Get-Process -Id $state.pid -ErrorAction SilentlyContinue) -and (Test-PulseHealth $state.port)) {
-      Write-Output "Pulse server already running at http://localhost:$($state.port) (PID=$($state.pid))"
+      Write-Output "Musify server already running at http://localhost:$($state.port) (PID=$($state.pid))"
       exit 0
     }
   } catch {
@@ -50,9 +50,9 @@ if (Test-PulseHealth $Port) {
   $stateObj = [pscustomobject]@{ pid = $existingPid; port = $Port }
   $stateObj | ConvertTo-Json | Set-Content $stateFile
   if ($existingPid) {
-    Write-Output "Pulse server already running at http://localhost:$Port (PID=$existingPid)"
+    Write-Output "Musify server already running at http://localhost:$Port (PID=$existingPid)"
   } else {
-    Write-Output "Pulse server already running at http://localhost:$Port"
+    Write-Output "Musify server already running at http://localhost:$Port"
   }
   exit 0
 }
@@ -90,4 +90,4 @@ if (-not $ok) {
 
 $stateObj = [pscustomobject]@{ pid = $proc.Id; port = $Port }
 $stateObj | ConvertTo-Json | Set-Content $stateFile
-Write-Output "Started Pulse server: http://localhost:$Port (PID=$($proc.Id))"
+Write-Output "Started Musify server: http://localhost:$Port (PID=$($proc.Id))"
