@@ -5,7 +5,7 @@ import {
   initShell,
   setImageWithFallback,
   setStatus,
-} from "./common.js?v=20260216m5";
+} from "./common.js?v=20260218m7";
 
 const refs = {
   country: document.querySelector("#artistsCountry"),

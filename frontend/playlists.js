@@ -1,4 +1,4 @@
-import { createSongCard, initShell, setStatus } from "./common.js?v=20260216m5";
+import { createSongCard, initShell, setStatus } from "./common.js?v=20260218m7";
 
 const STATIC_PLAYLISTS = [
   {

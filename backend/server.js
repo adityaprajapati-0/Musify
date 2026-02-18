@@ -1,8 +1,18 @@
 const http = require("http");
+const https = require("https");
 const fs = require("fs");
 const fsp = fs.promises;
 const path = require("path");
 const { URL } = require("url");
+
+process.on("uncaughtException", (err) => {
+  console.error("CRITICAL: UNCAUGHT EXCEPTION:", err);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("CRITICAL: UNHANDLED REJECTION:", reason);
+});
 
 const cliPortIndex = process.argv.indexOf("--port");
 const cliPortValue =
@@ -79,33 +89,73 @@ function upscaleArtwork(url) {
     .replace("200x200bb", "600x600bb");
 }
 
-async function fetchJson(url, options = {}) {
+function fetchJson(url, options = {}) {
   const timeoutMs = Number.isFinite(options.timeoutMs)
     ? options.timeoutMs
     : FETCH_TIMEOUT_MS;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const maxRedirects = 5;
+  let redirectCount = 0;
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Musify/1.0 (+local-dev)",
-        Accept: "application/json",
-      },
-      signal: controller.signal,
+  const doRequest = (currentUrl) => {
+    return new Promise((resolve, reject) => {
+      if (redirectCount > maxRedirects) {
+        return reject(new Error("Too many redirects"));
+      }
+
+      const req = https.get(
+        currentUrl,
+        {
+          headers: {
+            "User-Agent": "Musify/1.0 (+local-dev)",
+            Accept: "application/json",
+            "Accept-Encoding": "identity",
+          },
+        },
+        (res) => {
+          // Handle Redirects
+          if (
+            res.statusCode >= 300 &&
+            res.statusCode < 400 &&
+            res.headers.location
+          ) {
+            redirectCount++;
+            // Resolve relative URLs if needed, though usually location is absolute
+            const newLocation = new URL(
+              res.headers.location,
+              currentUrl,
+            ).toString();
+            res.resume(); // Consume/discard response data to free up socket
+            return resolve(doRequest(newLocation));
+          }
+
+          let data = "";
+          res.on("data", (chunk) => (data += chunk));
+          res.on("end", () => {
+            if (res.statusCode >= 200 && res.statusCode < 300) {
+              try {
+                resolve(JSON.parse(data));
+              } catch (e) {
+                reject(new Error("Failed to parse JSON response"));
+              }
+            } else {
+              reject(new Error(`Upstream request failed: ${res.statusCode}`));
+            }
+          });
+        },
+      );
+
+      req.on("error", (err) => {
+        reject(err);
+      });
+
+      req.setTimeout(timeoutMs, () => {
+        req.destroy();
+        reject(new Error(`Upstream request timed out after ${timeoutMs}ms`));
+      });
     });
-    if (!response.ok) {
-      throw new Error(`Upstream request failed: ${response.status}`);
-    }
-    return response.json();
-  } catch (error) {
-    if (error?.name === "AbortError") {
-      throw new Error(`Upstream request timed out after ${timeoutMs}ms`);
-    }
-    throw error;
-  } finally {
-    clearTimeout(timer);
-  }
+  };
+
+  return doRequest(url);
 }
 
 function readRequestBody(req, maxBytes = MAX_AI_BODY_BYTES) {
@@ -251,6 +301,7 @@ async function getTrending(country, limit) {
       return { items, source: "apple-rss" };
     }
   } catch (error) {
+    console.error("[Trending] Apple RSS failed:", error);
     // Fall through to iTunes fallback below.
   }
 
@@ -902,6 +953,7 @@ async function handleApi(req, reqUrl, res) {
 
     return sendJson(res, 404, { error: "Not found." });
   } catch (error) {
+    console.error("[API Error]", error);
     return sendJson(res, 502, { error: error.message || "Upstream error." });
   }
 }

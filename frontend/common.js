@@ -839,6 +839,10 @@ async function detectApiBase() {
     currentOrigin,
     ...runtimeFallbackBases(currentOrigin),
   ].filter((value, index, array) => array.indexOf(value) === index);
+  const acceptedServices = new Set([
+    "pulse-music-proxy",
+    "musify-music-proxy",
+  ]);
 
   for (const origin of candidates) {
     try {
@@ -849,7 +853,11 @@ async function detectApiBase() {
       );
       if (!response.ok) continue;
       const data = await response.json();
-      if (data?.ok === true && data?.service === "pulse-music-proxy") {
+      const service = String(data?.service || "").trim();
+      const healthy =
+        data?.ok === true &&
+        (!service || acceptedServices.has(service) || service.includes("proxy"));
+      if (healthy) {
         return origin === currentOrigin ? "" : origin;
       }
     } catch {

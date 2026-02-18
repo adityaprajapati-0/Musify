@@ -6,7 +6,7 @@ import {
   normalizeTrack,
   setImageWithFallback,
   setStatus,
-} from "./common.js?v=20260216m5";
+} from "./common.js?v=20260218m7";
 
 const refs = {
   cover: document.querySelector("#trackCover"),
